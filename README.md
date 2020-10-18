@@ -33,7 +33,11 @@ I am currently working on a macrophage differentiation model, in the context of 
 ## Required output format
 You'll need a text file containing the agents' coordinates and their attribute (color) for each frame (time step).
 The overall format should be : 
-[ [x(n<sub>0</sub>),y,0], [x,y,c], [x',y',c'], ..., [x'',y'',c''] ] 
+[ [x<sub>0</sub><sup>0</sup>,y<sub>0</sub>,0], [x<sub>0</sub>,y<sub>0</sub>,c<sub>0</sub>], [x<sub>1</sub>,y<sub>1</sub>,0], [x<sub>1</sub>,y<sub>1</sub>,c<sub>1</sub>], ..., [x<sub>n</sub>,y<sub>n</sub>,0], [x<sub>n</sub>,y<sub>n</sub>,c<sub>n</sub>] ]
+
+
+
+You can notice that  
 
 ### Coordinates
 
