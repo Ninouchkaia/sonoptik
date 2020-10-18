@@ -1,7 +1,7 @@
 # Sonoptic
 
 Sonoptic is an artistic residency focused on sound, visual and/or audiovisual approaches. 
-It was organized at [Myxart Myrys](http://mixart-myrys.org/)from October 5 to 10, 2020.
+It was organized at [Myxart Myrys](http://mixart-myrys.org/) from October 5 to 10, 2020.
 More info here : http://sonoptic.net/
 
 I joined the event with the aim of exploring different perspectives on data sonification and visualization.
@@ -31,8 +31,9 @@ I am currently working on a macrophage differentiation model, in the context of 
 # Plugging ABM simulations to Redis in real-time
 
 ## Required output format
-Containing the agents' coordinates and their attribute (color).
-The overall format should be [ [x,y,c], [x',y',c'], ..., [x'',y'',c'']]
+You'll need a text file containing the agents' coordinates and their attribute (color) for each frame (time step).
+The overall format should be : 
+[ [x(n<sub>0</sub>),y,0], [x,y,c], [x',y',c'], ..., [x'',y'',c''] ] 
 
 ### Coordinates
 
@@ -61,7 +62,7 @@ Green| 0,255,0 | 65280
 Blue | 0,0,255 | 255 
 Yellow | 255,255,0 | 16776960 
 Cyan | 0,255,255 | 65535 
-Magenta | 55,0,255 | 16711935
+Magenta | 255,0,255 | 16711935
 Black (not used) | 0,0,0 | 0 
 
 
@@ -71,8 +72,10 @@ Black (not used) | 0,0,0 | 0
 
 Command:
 ```bash
-tail -F <path_to_netlogo_code> | python3 clitools/exports/toRedis.py -i 127.0.0.1 -k /pl/0/0
+tail -F <path_to_netlogo_code> | python3 <path_to_clitools/exports/toRedis.py> -i 127.0.0.1 -k /pl/0/0
 ```
+
+Then open a browser with URL http://127.0.0.1/simu.html
 
 
 # Previous and ongoing works on data sonification
