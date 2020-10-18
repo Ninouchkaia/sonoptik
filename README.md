@@ -34,18 +34,20 @@ I am currently working on a macrophage differentiation model, in the context of 
 You'll need a text file containing the agents' coordinates and their attribute (color) for each frame (time step).
 The overall format should be : 
 
-[ [coordinates (x,y) of agent 0, black], [coordinates (x,y) of agent 0, color of agent 0], [coordinates (x,y) of agent 1, black], [coordinates (x,y) of agent 1, color of agent 1], ... [coordinates (x,y) of agent n, black], [coordinates (x,y) of agent n, color of agent 0] ] \n # data for the first timeframe
-[ [coordinates (x,y) of agent 0, black], [coordinates (x,y) of agent 0, color of agent 0], [coordinates (x,y) of agent 1, black], [coordinates (x,y) of agent 1, color of agent 1], ... [coordinates (x,y) of agent n, black], [coordinates (x,y) of agent n, color of agent 0] ] \n # data for the second timeframe
-...
-etc.
-
+[ [coordinates (x,y) of agent 0, black], [coordinates (x,y) of agent 0, color of agent 0], [coordinates (x,y) of agent 1, black], [coordinates (x,y) of agent 1, color of agent 1], ... [coordinates (x,y) of agent n, black], [coordinates (x,y) of agent n, color of agent 0] ] \n # data for the first timeframe  
+[ [coordinates (x,y) of agent 0, black], [coordinates (x,y) of agent 0, color of agent 0], [coordinates (x,y) of agent 1, black], [coordinates (x,y) of agent 1, color of agent 1], ... [coordinates (x,y) of agent n, black], [coordinates (x,y) of agent n, color of agent 0] ] \n # data for the second timeframe  
+...  
+etc.  
+  
 Or, written differently
-[ [x<sub>0</sub>,y<sub>0</sub>,0], [x<sub>0</sub>,y<sub>0</sub>,c<sub>0</sub>], [x<sub>1</sub>,y<sub>1</sub>,0], [x<sub>1</sub>,y<sub>1</sub>,c<sub>1</sub>], ..., [x<sub>n</sub>,y<sub>n</sub>,0], [x<sub>n</sub>,y<sub>n</sub>,c<sub>n</sub>] ] \n # first timeframe
-[ [x'<sub>0</sub>,y'<sub>0</sub>,0], [x'<sub>0</sub>,y'<sub>0</sub>,c'<sub>0</sub>], [x'<sub>1</sub>,y'<sub>1</sub>,0], [x'<sub>1</sub>,y'<sub>1</sub>,c'<sub>1</sub>], ..., [x'<sub>n</sub>,y'<sub>n</sub>,0], [x'<sub>n</sub>,y'<sub>n</sub>,c'<sub>n</sub>] ] \n # second timeframe
+[ [x<sub>0</sub>,y<sub>0</sub>,0], [x<sub>0</sub>,y<sub>0</sub>,c<sub>0</sub>], [x<sub>1</sub>,y<sub>1</sub>,0], [x<sub>1</sub>,y<sub>1</sub>,c<sub>1</sub>], ..., [x<sub>n</sub>,y<sub>n</sub>,0], [x<sub>n</sub>,y<sub>n</sub>,c<sub>n</sub>] ] \n # first timeframe  
+[ [x'<sub>0</sub>,y'<sub>0</sub>,0], [x'<sub>0</sub>,y'<sub>0</sub>,c'<sub>0</sub>], [x'<sub>1</sub>,y'<sub>1</sub>,0], [x'<sub>1</sub>,y'<sub>1</sub>,c'<sub>1</sub>], ..., [x'<sub>n</sub>,y'<sub>n</sub>,0], [x'<sub>n</sub>,y'<sub>n</sub>,c'<sub>n</sub>] ] \n # second timeframe  
 ...
-[ [x''<sub>0</sub>,y''<sub>0</sub>,0], [x''<sub>0</sub>,y''<sub>0</sub>,c''<sub>0</sub>], [x''<sub>1</sub>,y''<sub>1</sub>,0], [x''<sub>1</sub>,y''<sub>1</sub>,c''<sub>1</sub>], ..., [x''<sub>n</sub>,y''<sub>n</sub>,0], [x''<sub>n</sub>,y''<sub>n</sub>,c''<sub>n</sub>] ] # third timeframe
+[ [x''<sub>0</sub>,y''<sub>0</sub>,0], [x''<sub>0</sub>,y''<sub>0</sub>,c''<sub>0</sub>], [x''<sub>1</sub>,y''<sub>1</sub>,0], [x''<sub>1</sub>,y''<sub>1</sub>,c''<sub>1</sub>], ..., [x''<sub>n</sub>,y''<sub>n</sub>,0], [x''<sub>n</sub>,y''<sub>n</sub>,c''<sub>n</sub>] ] # third timeframe  
 
-See output examples. You can notice that every agent's coordinates has to be duplicated with one set with black color and another one with the color we want. This is a property of the lasers, not to have all points linked together. But if you want to have them linked, just use a single set of coordinates with the color you want, this can actually give some nice visuals too !
+See output examples.  
+  
+You can notice that every agent's coordinates has to be duplicated with one set with black color and another one with the color we want. This is a property of the lasers, not to have all points linked together. But if you want to have them linked, just use a single set of coordinates with the color you want, this can actually give some nice visuals too !
 
 
 ### Coordinates
