@@ -43,7 +43,7 @@ The overall format should be [ [x,y,c], [x',y',c'], ..., [x'',y'',c'']]
 
 The color has to be coded in 8-bits formats. 
 
-![RGB model](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/AdditiveColor.svg/1024px-AdditiveColor.svg.png)
+![RGB model](https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/AdditiveColor.svg/1024px-AdditiveColor.svg.png | width=100)
 
 I used this function from their [library](https://git.interhacker.space/teamlaser/LJ/src/branch/master/clitools/filters/colorcycle.py) to transform RGB code into the required format :
 
@@ -55,9 +55,14 @@ I executed it for all colors from the [RGB color model](https://en.wikipedia.org
 
 Color | RGB format | int format
 ------------ | ------------ | -------------
-White | XXX | YYY
-Red | XXX | YYY
-Green| | 
+White | 255,255,255 | 16777215 
+Red | 255,0,0 | 16711680 
+Green| 0,255,0 | 65280 
+Blue | 0,0,255 | 255 
+Yellow | 255,255,0 | 16776960 
+Cyan | 0,255,255 | 65535 
+Magenta | 55,0,255 | 16711935
+Black (not used) | 0,0,0 | 0 
 
 
 
