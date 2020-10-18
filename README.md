@@ -43,10 +43,7 @@ The overall format should be [ [x,y,c], [x',y',c'], ..., [x'',y'',c'']]
 
 The color has to be coded in 8-bits formats. 
 
-<img align="right" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/AdditiveColor.svg/1024px-AdditiveColor.svg.png" width=96>
-
-
-<img src="https://github.com/favicon.ico" width="48">
+<img align="left" src="https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/AdditiveColor.svg/1024px-AdditiveColor.svg.png" width=96>
 
 I used this function from their [library](https://git.interhacker.space/teamlaser/LJ/src/branch/master/clitools/filters/colorcycle.py) to transform RGB code into the required format :
 
