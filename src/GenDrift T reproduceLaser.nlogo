@@ -1,36 +1,25 @@
-globals [
-  max-percent  ;; percent of the total population that is in the
-               ;; most populous group
-]
-
 to setup
-  ;; We don't use clear-all here because that would erase
-  ;; any walls the user drew.
-  clear-turtles
-  clear-all-plots
-  ;; create turtles with random colors and locations
+  clear-all
   create-turtles number [
-    set color item (random colors) [5 15 25 35 45 55 65]; 85 95 125]
+    set color item (random colors) [5 15 25 35 45 55 65]
+    if color = turquoise     ;; turquoise (75) is too similar to another color
+      [ set color magenta ]  ;; so use magenta (125) instead
     setxy random-xcor random-ycor
-    move-off-wall
   ]
   reset-ticks
 end
 
 to go
-  if (variance [color] of turtles) = 0
-    [ stop ]
+  ;;if variance [color] of turtles = 0
+  ;;  [ stop ]
   ask turtles [
-    rt random 50 - random 50
-    meet
-    ;; move, but don't step on wall
-    ifelse [pcolor] of patch-ahead 0.5 = black
-      [ fd 0.5 ]
-      [ rt random 360 ]
+    rt random 50
+    lt random 50
+    fd 1
   ]
-  find-top-species
-
-  file-open "simu_output_gendrift_3.txt"
+  birth
+  death
+  file-open "simu_output_gendrift_reprod.txt"
   output_coordinates
   tick
   file-close
@@ -61,65 +50,24 @@ to file_write [my_breed]
 
   file-type "[" file-write x file-type "," file-write y file-type "," file-type 0 file-type "]" file-type ","
   file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
   file-type "[" file-write x + 1 file-type "," file-write y + 1 file-type "," file-type my_breed file-type "]" file-type ","
 
 end
 
-to meet    ;; turtle procedure - when two turtles are next door,
-           ;; the left one changes to the color of the right one
-  let candidate one-of turtles-at 1 0
-  if candidate != nobody [
-    set color [color] of candidate
-  ]
+;; turtles hatch between 0 and 4 babies
+to birth
+  ask turtles
+    [ hatch random 5 [ fd 1 ] ]
 end
 
-to find-top-species  ;;find the percentage of the most populous species
-  let winning-amount 0
-  foreach base-colors [ c ->
-    let how-many count turtles with [color = c]
-    if how-many > winning-amount
-      [ set winning-amount how-many ]
-  ]
-  set max-percent (100 * winning-amount / count turtles)
-end
-
-;; ---------------------------------------------------------------------------------
-;; Below this point are procedure definitions that have to do with "walls," which
-;; the user may create in order to separate groups of turtles from one another.
-;; The use of walls is optional, and can be seen as a more advanced topic.
-;; ---------------------------------------------------------------------------------
-
-to place-wall
-  if mouse-down? [
-    ;; Note that when we place a wall, we must also place walls
-    ;; at the world boundaries, so turtles can't change rooms
-    ;; by wrapping around the edge of the world.
-    ask patches with [abs pycor = max-pycor or
-                      pycor = round mouse-ycor] [
-      set pcolor white
-      ;; There might be some turtles standing where the
-      ;; new walls is, so we need to move them into a room.
-      ask turtles-here [ move-off-wall ]
-    ]
-    display
-  ]
-end
-
-to remove-wall
-  if mouse-down? [
-    ask patches with [pycor = round mouse-ycor]
-      [ set pcolor black ]
-    display
-  ]
-end
-
-to remove-all-walls
-  clear-patches
-end
-
-to move-off-wall  ;; turtle procedure
-  while [pcolor != black] [
-    move-to one-of neighbors
+;; if the overall population is greater than the original number,
+;; randomly kill turtles to keep population roughly constant
+to death
+  let total-turtles count turtles
+  ask turtles [
+    if random total-turtles > number
+      [ die ]
   ]
 end
 
@@ -128,13 +76,13 @@ end
 ; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
-305
+320
 10
 733
-439
+424
 -1
 -1
-12.0
+9.0
 1
 10
 1
@@ -144,10 +92,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--17
-17
--17
-17
+-22
+22
+-22
+22
 1
 1
 1
@@ -155,10 +103,10 @@ ticks
 30.0
 
 BUTTON
-98
-80
-171
-113
+114
+33
+188
+66
 go
 go
 T
@@ -172,10 +120,10 @@ NIL
 0
 
 BUTTON
-18
-80
-95
-113
+28
+33
+103
+66
 setup
 setup
 NIL
@@ -189,10 +137,10 @@ NIL
 1
 
 SLIDER
-158
-36
-287
-69
+33
+77
+181
+110
 colors
 colors
 2
@@ -204,32 +152,32 @@ NIL
 HORIZONTAL
 
 SLIDER
-15
-36
-156
-69
+28
+114
+189
+147
 number
 number
 1
 1000
-72.0
+90.0
 1
 1
 NIL
 HORIZONTAL
 
 PLOT
-5
-130
-298
-353
+4
+162
+317
+416
 Turtle Populations
 Time
 Number
 0.0
-100.0
+50.0
 0.0
-70.0
+50.0
 true
 false
 "set-plot-y-range 0 count turtles" ""
@@ -246,117 +194,45 @@ PENS
 "color95" 1.0 0 -13791810 true "" "plot count turtles with [color = 95]"
 
 MONITOR
-35
-151
-152
-196
-% most populous
-max-percent
-2
+220
+75
+306
+120
+Total Turtles
+count turtles
+0
 1
 11
-
-BUTTON
-5
-421
-95
-454
-NIL
-place-wall
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-100
-421
-195
-454
-NIL
-remove-wall
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-200
-421
-300
-454
-NIL
-remove-all-walls
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-TEXTBOX
-24
-391
-281
-419
-As the model runs, you may optionally create and\nremove walls that separate groups of turtles.
-10
-0.0
-0
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-This model is an example of random selection. It shows that turtles that randomly exchange colors converge on a single color.  The idea, explained in more detail in Dennett's "Darwin's Dangerous Idea", is that trait drifts can occur without any particular purpose or "selective pressure".
+This model is an example of genetic drift.  It shows that competing breeds of turtles, each reproducing with equal likelihood on each turn, will ultimately converge on one breed without any selection pressure forcing this convergence.  The idea, explained in more detail in Dennett's "Darwin's Dangerous Idea", is that trait drifts can occur without any particular purpose or 'selecting pressure'.
 
 ## HOW IT WORKS
 
-The model starts with a random distribution of colored agents.  Turtles move by wiggling randomly across the world. When two turtles are next to each other, one turtle changes its color to the color of the other one.  Note that if a color dies out, it can never come back.
+The model starts with a random distribution of colored turtles.  They move by wiggling randomly across the world. Each turn, a turtle produces between 0 and 4 offspring.  If the total number of turtles is greater than the original number, then turtles are randomly killed until the original number is restored. After enough turns, a color will gain a slight dominance. By statistical advantage, a dominant color becomes more likely to win the entire grid.   However, because the process is random, there will usually be a series of dominant colors before one color finally wins.   Equally important is the fact that a color can never come back once it dies out.
 
 ## HOW TO USE IT
 
-The NUMBER slider sets the number of turtles. The COLORS slider selects the number of competing colors, up to ten.
-
-The SETUP button initializes the model, and GO runs the model.
-
-A monitor shows the percentage of turtles sharing the most common color.  When this reaches 100%, the model stops.
-
-After pressing PLACE-WALLS, the user can "draw" walls in the world at the location where the user clicks with the mouse.  By pressing REMOVE-WALLS, the user can remove added walls.  The REMOVE-ALL-WALLS button removes all walls including the border.  (The SETUP button does not remove walls.)
+The "setup" button initializes the model.
+The "go" button runs the model.
+Use the "colors" slider to select the number of competing colors.
+The "number" slider sets the initial number of turtles.
 
 ## THINGS TO NOTICE
 
-Gradually a color will gain a slight dominance. By statistical advantage, a dominant color becomes more likely to have more colors like it.  However, because the process is random, there will usually be a series of dominant colors before one color finally wins.
-
-## THINGS TO TRY
-
-Experiment with adding walls.
-
-When walls are added, groups of individuals can be geographically isolated so that they can not interact with their neighbors on the other side of the wall. Groups that are geographically isolated with walls will often end up with a different dominant color than the larger population.  A group of individuals that is walled off becomes a "founding group".  The founding group of individuals has a different genetic variability and distribution than the main population, so the frequency of certain traits may end up drifting in a different direction compared with the much larger population.
+Notice that often colors can get to quite a high population but still fail to win the race.
 
 ## EXTENDING THE MODEL
 
-In this model, a turtle looks one patch to its right.  If there's another turtle there, the "looking" turtle changes to that turtle's color.  Since the turtles move randomly about the world, it's a matter of chance which turtle will change to the color of its neighbor.
-
-Think of other rules for turtle interactions, random or otherwise, by which a turtle color might "take over".
+The grim reaper in the procedure `death` does a random harvesting of the population to keep it roughly constant.  This might be somewhat like a natural environment with a limited food supply.  Can you think of other ways to write this procedure?  Are the results affected?
 
 ## RELATED MODELS
 
-* GenDrift (P Global)
-* GenDrift (P local)
-* GenDrift (T reproduce)
+* GenDrift P global
+* GenDrift P local
+* GenDrift T interact
 
 ## HOW TO CITE
 
@@ -364,7 +240,7 @@ If you mention this model or the NetLogo software in a publication, we ask that 
 
 For the model itself:
 
-* Wilensky, U. (1997).  NetLogo GenDrift T interact model.  http://ccl.northwestern.edu/netlogo/models/GenDriftTinteract.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+* Wilensky, U. (1997).  NetLogo GenDrift T reproduce model.  http://ccl.northwestern.edu/netlogo/models/GenDriftTreproduce.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 
 Please cite the NetLogo software as:
 

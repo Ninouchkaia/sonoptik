@@ -1,36 +1,41 @@
-globals [
-  max-percent  ;; percent of the total population that is in the
-               ;; most populous group
+turtles-own [
+  visible-neighbors      ;; what birds can I see nearby?
+  closest-neighbor       ;; who's the closest bird I can see?
+  speed                  ;; what speed am I flying at?
+  happy?                 ;; am I content with my current place?
 ]
 
+;;
+;; Setup Procedures
+;;
+
 to setup
-  ;; We don't use clear-all here because that would erase
-  ;; any walls the user drew.
-  clear-turtles
-  clear-all-plots
-  ;; create turtles with random colors and locations
-  create-turtles number [
-    set color item (random colors) [5 15 25 35 45 55 65]; 85 95 125]
+  clear-all
+  create-turtles number-of-birds [
     setxy random-xcor random-ycor
-    move-off-wall
+    set speed base-speed
+    set size 1.5 ; easier to see
+    set happy? false
+    recolor
   ]
   reset-ticks
 end
 
-to go
-  if (variance [color] of turtles) = 0
-    [ stop ]
-  ask turtles [
-    rt random 50 - random 50
-    meet
-    ;; move, but don't step on wall
-    ifelse [pcolor] of patch-ahead 0.5 = black
-      [ fd 0.5 ]
-      [ rt random 360 ]
-  ]
-  find-top-species
+;;
+;; Runtime Procedures
+;;
 
-  file-open "simu_output_gendrift_3.txt"
+to go
+  ask turtles [
+    set speed base-speed
+    set visible-neighbors (other turtles in-cone vision-distance vision-cone)
+    ifelse any? visible-neighbors
+      [ adjust ]
+      [ set happy? true ]
+    recolor
+    fd speed  ; fly forward!
+  ]
+  file-open "simu_output_flocking_vee.txt"
   output_coordinates
   tick
   file-close
@@ -39,16 +44,7 @@ end
 to output_coordinates
   file-type "["
   ask turtles
-  [
-   if color = 5 [ file_write "16711680"]
-   if color = 15 [ file_write "16711935"]
-   if color = 25 [ file_write "16776960"]
-   if color = 35 [ file_write "255"]
-   if color = 45 [ file_write "65280"]
-   if color = 55 [ file_write "16777215"]
-   if color = 65 [ file_write "65535"]
-  ]
-
+  [ file_write "16711680"]
   file-type "]"
   file-type "\n"
 end
@@ -59,82 +55,91 @@ to file_write [my_breed]
   let y1 ycor + min-pycor
   let y round (y1 * (800 / (min-pycor - max-pycor)))
 
-  file-type "[" file-write x file-type "," file-write y file-type "," file-type 0 file-type "]" file-type ","
+  ;file-type "[" file-write x file-type "," file-write y file-type "," file-type 0 file-type "]" file-type ","
   file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
-  file-type "[" file-write x + 1 file-type "," file-write y + 1 file-type "," file-type my_breed file-type "]" file-type ","
+  ;file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
 
 end
 
-to meet    ;; turtle procedure - when two turtles are next door,
-           ;; the left one changes to the color of the right one
-  let candidate one-of turtles-at 1 0
-  if candidate != nobody [
-    set color [color] of candidate
+to adjust ;; turtle procedure
+  set closest-neighbor min-one-of visible-neighbors [distance myself]
+  let closest-distance distance closest-neighbor
+  ;; if I am too far away from the nearest bird I can see, then try to get near them
+  if closest-distance > updraft-distance [
+    turn-towards (towards closest-neighbor)
+    ;; speed up to catch up
+    set speed base-speed * (1 + speed-change-factor)
+    set happy? false
+    stop
+  ]
+
+  ;; if my view is obstructed, move sideways randomly
+  if any? visible-neighbors in-cone vision-distance obstruction-cone [
+    turn-at-most (random-float (max-turn * 2) - max-turn)
+    ;; speed up to get out of the way
+    set speed base-speed * (1 + speed-change-factor)
+    set happy? false
+    stop
+  ]
+
+  ;; if i am too close to the nearest bird slow down
+  if closest-distance < too-close [
+    set happy? false
+    ;; speed down to let the bird in front of me move away
+    set speed base-speed * (1 - speed-change-factor)
+    stop
+  ]
+
+  ;; if all three conditions are filled, adjust
+  ;; to the speed and heading of my neighbor and take it easy
+  set speed [speed] of closest-neighbor
+  turn-towards [heading] of closest-neighbor
+  set happy? true
+end
+
+to recolor ;; turtle procedure
+  ifelse show-unhappy? [
+    ifelse happy?
+      [ set color white ]
+      [ set color red ]
+  ][
+    ;; This changes the bird's color some shade of yellow --
+    ;; note that the color is based on WHO number, not RANDOM, so birds
+    ;; won't change color if the SHOW-UNHAPPY? switch is flicked on and off
+    set color yellow - 2 + (who mod 7)
   ]
 end
 
-to find-top-species  ;;find the percentage of the most populous species
-  let winning-amount 0
-  foreach base-colors [ c ->
-    let how-many count turtles with [color = c]
-    if how-many > winning-amount
-      [ set winning-amount how-many ]
-  ]
-  set max-percent (100 * winning-amount / count turtles)
+;;
+;; TURTLE UTILITY PROCEDURES, for turning gradually towards a new heading
+;;
+
+to turn-towards [new-heading]  ;; turtle procedure
+  turn-at-most (subtract-headings new-heading heading)
 end
 
-;; ---------------------------------------------------------------------------------
-;; Below this point are procedure definitions that have to do with "walls," which
-;; the user may create in order to separate groups of turtles from one another.
-;; The use of walls is optional, and can be seen as a more advanced topic.
-;; ---------------------------------------------------------------------------------
-
-to place-wall
-  if mouse-down? [
-    ;; Note that when we place a wall, we must also place walls
-    ;; at the world boundaries, so turtles can't change rooms
-    ;; by wrapping around the edge of the world.
-    ask patches with [abs pycor = max-pycor or
-                      pycor = round mouse-ycor] [
-      set pcolor white
-      ;; There might be some turtles standing where the
-      ;; new walls is, so we need to move them into a room.
-      ask turtles-here [ move-off-wall ]
-    ]
-    display
-  ]
-end
-
-to remove-wall
-  if mouse-down? [
-    ask patches with [pycor = round mouse-ycor]
-      [ set pcolor black ]
-    display
-  ]
-end
-
-to remove-all-walls
-  clear-patches
-end
-
-to move-off-wall  ;; turtle procedure
-  while [pcolor != black] [
-    move-to one-of neighbors
+to turn-at-most [turn]  ;; turtle procedure
+  ifelse abs turn > max-turn [
+    ifelse turn >= 0
+      [ rt max-turn ]
+      [ lt max-turn ]
+  ] [
+    rt turn
   ]
 end
 
 
-; Copyright 1997 Uri Wilensky.
+; Copyright 2009 Uri Wilensky.
 ; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
-305
+200
 10
-733
-439
+705
+516
 -1
 -1
-12.0
+7.0
 1
 10
 1
@@ -144,143 +149,86 @@ GRAPHICS-WINDOW
 1
 1
 1
--17
-17
--17
-17
+-35
+35
+-35
+35
 1
 1
 1
 ticks
-30.0
-
-BUTTON
-98
-80
-171
-113
-go
-go
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-0
-
-BUTTON
-18
-80
-95
-113
-setup
-setup
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
+45.0
 
 SLIDER
-158
-36
-287
-69
-colors
-colors
-2
 10
-5.0
+115
+190
+148
+vision-distance
+vision-distance
+0
+20
+10.0
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-15
-36
-156
-69
-number
-number
+10
+325
+190
+358
+updraft-distance
+updraft-distance
 1
-1000
-72.0
+50
+38.0
 1
 1
 NIL
 HORIZONTAL
 
-PLOT
-5
-130
-298
-353
-Turtle Populations
-Time
-Number
-0.0
-100.0
-0.0
-70.0
-true
-false
-"set-plot-y-range 0 count turtles" ""
-PENS
-"color5" 1.0 0 -7500403 true "" "plot count turtles with [color = 5]"
-"color15" 1.0 0 -2674135 true "" "plot count turtles with [color = 15]"
-"color25" 1.0 0 -955883 true "" "plot count turtles with [color = 25]"
-"color35" 1.0 0 -6459832 true "" "plot count turtles with [color = 35]"
-"color45" 1.0 0 -1184463 true "" "plot count turtles with [color = 45]"
-"color55" 1.0 0 -10899396 true "" "plot count turtles with [color = 55]"
-"color65" 1.0 0 -13840069 true "" "plot count turtles with [color = 65]"
-"color125" 1.0 0 -5825686 true "" "plot count turtles with [color = 75]"
-"color85" 1.0 0 -11221820 true "" "plot count turtles with [color = 85]"
-"color95" 1.0 0 -13791810 true "" "plot count turtles with [color = 95]"
-
-MONITOR
-35
-151
-152
-196
-% most populous
-max-percent
-2
+SLIDER
+10
+185
+190
+218
+obstruction-cone
+obstruction-cone
+0
+vision-cone
+45.0
 1
-11
-
-BUTTON
-5
-421
-95
-454
-NIL
-place-wall
-T
 1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
+deg
+HORIZONTAL
 
 BUTTON
 100
-421
-195
-454
+50
+185
+83
 NIL
-remove-wall
+go
 T
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+0
+
+BUTTON
+10
+50
+95
+83
+NIL
+setup
+NIL
 1
 T
 OBSERVER
@@ -290,73 +238,205 @@ NIL
 NIL
 1
 
-BUTTON
-200
-421
-300
-454
-NIL
-remove-all-walls
-NIL
+SLIDER
+10
+255
+190
+288
+base-speed
+base-speed
+0
+2
+0.86
+.01
 1
-T
-OBSERVER
 NIL
+HORIZONTAL
+
+SLIDER
+10
+150
+190
+183
+vision-cone
+vision-cone
+0
+270
+120.0
+1
+1
+deg
+HORIZONTAL
+
+SLIDER
+10
+360
+190
+393
+too-close
+too-close
+.5
+updraft-distance - .1
+1.6
+.1
+1
 NIL
+HORIZONTAL
+
+SLIDER
+10
+395
+190
+428
+max-turn
+max-turn
+1
+30
+4.0
+1
+1
+deg
+HORIZONTAL
+
+SWITCH
+10
+460
+190
+493
+show-unhappy?
+show-unhappy?
+1
+1
+-1000
+
+SLIDER
+10
+10
+185
+43
+number-of-birds
+number-of-birds
+0
+100
+39.0
+1
+1
 NIL
-NIL
+HORIZONTAL
+
+TEXTBOX
+40
+95
+175
+113
+Vision Parameters
+13
+0.0
 1
 
 TEXTBOX
-24
-391
-281
-419
-As the model runs, you may optionally create and\nremove walls that separate groups of turtles.
-10
+40
+235
+170
+253
+Motion Parameters
+13
 0.0
+1
+
+TEXTBOX
+55
+440
+180
+458
+Visualization
+13
+0.0
+1
+
+SLIDER
+10
+290
+190
+323
+speed-change-factor
+speed-change-factor
 0
+1
+0.55
+.05
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-This model is an example of random selection. It shows that turtles that randomly exchange colors converge on a single color.  The idea, explained in more detail in Dennett's "Darwin's Dangerous Idea", is that trait drifts can occur without any particular purpose or "selective pressure".
+This is an adaptation of the Flocking model to produce V-like formations in artificial flocks.  Not all birds produce V-like formations when they flock, but they are often observed in large birds traveling together distances (e.g. migrating Canada geese).  This model demonstrates simple rules that cause V-formations to occur.
 
 ## HOW IT WORKS
 
-The model starts with a random distribution of colored agents.  Turtles move by wiggling randomly across the world. When two turtles are next to each other, one turtle changes its color to the color of the other one.  Note that if a color dies out, it can never come back.
+Each bird starts out with a random position and heading in the world. If the bird cannot see any other birds in its limited vision range, it will continue to fly straight at its normal base speed.  If it can see another bird, it follows four basic rules, given by this order of precedence.
+
+1. If it is too far away (that is, further than the distance for getting an updraft benefit) from the nearest visible bird, it will turn toward that bird and speed up to get near it.
+2. Once it is near enough to another bird, it will move randomly to one side or another until its view is no longer obstructed.
+3. If it gets too close to another bird, it will slow down.
+4. Once the three conditions above are met (the bird has an unobstructed view and is sufficiently close but not too close to another bird), the bird will set both its speed and its heading that of its closest visible neighbor.
 
 ## HOW TO USE IT
 
-The NUMBER slider sets the number of turtles. The COLORS slider selects the number of competing colors, up to ten.
+NUMBER-OF-BIRDS sets the number of birds in the world.
+Use SETUP to populate the world with birds, and GO to run the model.
 
-The SETUP button initializes the model, and GO runs the model.
+Vision Parameters:
+VISION-DISTANCE and VISION-CONE defines the radius and angle span, respectively, of the area within which a bird can see another bird. A VISION-CONE of 120 means that the bird can see up to 60 degrees to its right and 60 degrees to its left. OBSTRUCTION-CONE defines the angle span for which a bird considers its vision to be obstructed by another bird.
 
-A monitor shows the percentage of turtles sharing the most common color.  When this reaches 100%, the model stops.
+Motion Parameters:
+BASE-SPEED defines the speed that birds will fly if they are not speeding up to catch another bird that they see, or slowing down to avoid colliding with a bird.
+SPEED-CHANGE-FACTOR is the factor by which birds increase or decrease their speed, given as a fraction of their base speed.  A BASE-SPEED of 1 with a SPEED-CHANGE-FACTOR of 0.25 means that birds will travel at speeds of 0.75 (slow speed), 1.0 (normal speed), or 1.25 (fast speed).
+UPDRAFT-DISTANCE defines how near to another bird one must be to take advantage of its upwash.
+TOO-CLOSE defines how close one bird can be to another bird before slowing down to avoid collision.
+MAX-TURN sets the maximum number of degrees that a bird can turn during a single tick.
 
-After pressing PLACE-WALLS, the user can "draw" walls in the world at the location where the user clicks with the mouse.  By pressing REMOVE-WALLS, the user can remove added walls.  The REMOVE-ALL-WALLS button removes all walls including the border.  (The SETUP button does not remove walls.)
+Visualization Parameters:
+If SHOW-UNHAPPY? is switched ON, birds that have not satisfied the conditions outlined in the HOW IT WORKS section are colored red, and all the birds that have are colored white. If SHOW-UNHAPPY? is OFF, birds are colored varying shades of yellow.
 
 ## THINGS TO NOTICE
 
-Gradually a color will gain a slight dominance. By statistical advantage, a dominant color becomes more likely to have more colors like it.  However, because the process is random, there will usually be a series of dominant colors before one color finally wins.
+After forming a vee-flock for a while, birds tend to drift apart from one another.
+
+Birds following these rules may form flock formations other than a balanced V. These include asymmetrical (unbalanced) V shapes, echelons (diagonal lines), or inverted V shapes.  In fact, imperfect formations such as these are more commonly observed than balanced vees in nature too.
 
 ## THINGS TO TRY
 
-Experiment with adding walls.
+Play with the sliders to see if you can get tighter flocks, looser flocks, fewer flocks, more flocks, more or less splitting and joining of flocks, more or less rearranging of birds within flocks, etc.
 
-When walls are added, groups of individuals can be geographically isolated so that they can not interact with their neighbors on the other side of the wall. Groups that are geographically isolated with walls will often end up with a different dominant color than the larger population.  A group of individuals that is walled off becomes a "founding group".  The founding group of individuals has a different genetic variability and distribution than the main population, so the frequency of certain traits may end up drifting in a different direction compared with the much larger population.
+Does having lots of birds make it more or less likely to form good V shapes?
+
+Can you set parameters such that running the model for a long time produces a single static flock?  Or will the birds never settle down to a fixed formation?
 
 ## EXTENDING THE MODEL
 
-In this model, a turtle looks one patch to its right.  If there's another turtle there, the "looking" turtle changes to that turtle's color.  Since the turtles move randomly about the world, it's a matter of chance which turtle will change to the color of its neighbor.
+What would happen if you put walls around the edges of the world that the birds can't fly through?
 
-Think of other rules for turtle interactions, random or otherwise, by which a turtle color might "take over".
+What would happen if you gave birds limited energy levels, so that flying fast would make them expend more energy and eventually become exhausted.  Flying slowly, or within another bird's updraft, could allow them to recoup some energy.
+
+Try making a 3D version of this model.  What additional considerations have to be taken into account in three dimensions?
+
+## NETLOGO FEATURES
+
+Birds use `in-cone` to find neighbors and determine whether their view is obstructed.
+
+The `subtract-headings` primitive is also useful, for turning gradually (only partway) toward some new heading.
 
 ## RELATED MODELS
 
-* GenDrift (P Global)
-* GenDrift (P local)
-* GenDrift (T reproduce)
+Flocking
+
+## CREDITS AND REFERENCES
+
+This model is loosely based on rules introduced in the paper:
+Nathan, A. & Barbosa, V. C. (2008). V-like formations in flocks of artificial birds. Artificial Life, 14(2), pp. 179-188. (available at https://arxiv.org/pdf/cs/0611032.pdf)
 
 ## HOW TO CITE
 
@@ -364,7 +444,7 @@ If you mention this model or the NetLogo software in a publication, we ask that 
 
 For the model itself:
 
-* Wilensky, U. (1997).  NetLogo GenDrift T interact model.  http://ccl.northwestern.edu/netlogo/models/GenDriftTinteract.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+* Wilkerson-Jerde, M., Stonedahl, F. and Wilensky, U. (2009).  NetLogo Flocking Vee Formations model.  http://ccl.northwestern.edu/netlogo/models/FlockingVeeFormations.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 
 Please cite the NetLogo software as:
 
@@ -372,7 +452,7 @@ Please cite the NetLogo software as:
 
 ## COPYRIGHT AND LICENSE
 
-Copyright 1997 Uri Wilensky.
+Copyright 2009 Uri Wilensky.
 
 ![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
@@ -380,11 +460,7 @@ This work is licensed under the Creative Commons Attribution-NonCommercial-Share
 
 Commercial licenses are also available. To inquire about commercial licenses, please contact Uri Wilensky at uri@northwestern.edu.
 
-This model was created as part of the project: CONNECTED MATHEMATICS: MAKING SENSE OF COMPLEX PHENOMENA THROUGH BUILDING OBJECT-BASED PARALLEL MODELS (OBPML).  The project gratefully acknowledges the support of the National Science Foundation (Applications of Advanced Technologies Program) -- grant numbers RED #9552950 and REC #9632612.
-
-This model was converted to NetLogo as part of the projects: PARTICIPATORY SIMULATIONS: NETWORK-BASED DESIGN FOR SYSTEMS LEARNING IN CLASSROOMS and/or INTEGRATED SIMULATION AND MODELING ENVIRONMENT. The project gratefully acknowledges the support of the National Science Foundation (REPP & ROLE programs) -- grant numbers REC #9814682 and REC-0126227. Converted from StarLogoT to NetLogo, 2001.
-
-<!-- 1997 2001 -->
+<!-- 2009 Cite: Wilkerson-Jerde, M., Stonedahl, F. -->
 @#$#@#$#@
 default
 true
@@ -670,6 +746,8 @@ Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
 NetLogo 6.1.0
 @#$#@#$#@
+setup
+repeat 1000 [ go ]
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
@@ -685,5 +763,5 @@ true
 Line -7500403 true 150 150 90 180
 Line -7500403 true 150 150 210 180
 @#$#@#$#@
-0
+1
 @#$#@#$#@

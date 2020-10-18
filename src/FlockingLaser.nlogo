@@ -1,36 +1,27 @@
-globals [
-  max-percent  ;; percent of the total population that is in the
-               ;; most populous group
+turtles-own [
+  flockmates         ;; agentset of nearby turtles
+  nearest-neighbor   ;; closest one of our flockmates
 ]
 
 to setup
-  ;; We don't use clear-all here because that would erase
-  ;; any walls the user drew.
-  clear-turtles
-  clear-all-plots
-  ;; create turtles with random colors and locations
-  create-turtles number [
-    set color item (random colors) [5 15 25 35 45 55 65]; 85 95 125]
-    setxy random-xcor random-ycor
-    move-off-wall
-  ]
+  clear-all
+  create-turtles population
+    [ set color yellow - 2 + random 7  ;; random shades look nice
+      set size 1.5  ;; easier to see
+      setxy random-xcor random-ycor
+      set flockmates no-turtles ]
   reset-ticks
 end
 
 to go
-  if (variance [color] of turtles) = 0
-    [ stop ]
-  ask turtles [
-    rt random 50 - random 50
-    meet
-    ;; move, but don't step on wall
-    ifelse [pcolor] of patch-ahead 0.5 = black
-      [ fd 0.5 ]
-      [ rt random 360 ]
-  ]
-  find-top-species
-
-  file-open "simu_output_gendrift_3.txt"
+  ask turtles [ flock ]
+  ;; the following line is used to make the turtles
+  ;; animate more smoothly.
+  repeat 5 [ ask turtles [ fd 0.2 ] display ]
+  ;; for greater efficiency, at the expense of smooth
+  ;; animation, substitute the following line instead:
+  ;;   ask turtles [ fd 1 ]
+  file-open "simu_output_flocking.txt"
   output_coordinates
   tick
   file-close
@@ -39,16 +30,7 @@ end
 to output_coordinates
   file-type "["
   ask turtles
-  [
-   if color = 5 [ file_write "16711680"]
-   if color = 15 [ file_write "16711935"]
-   if color = 25 [ file_write "16776960"]
-   if color = 35 [ file_write "255"]
-   if color = 45 [ file_write "65280"]
-   if color = 55 [ file_write "16777215"]
-   if color = 65 [ file_write "65535"]
-  ]
-
+  [ file_write "65535" ]
   file-type "]"
   file-type "\n"
 end
@@ -61,80 +43,104 @@ to file_write [my_breed]
 
   file-type "[" file-write x file-type "," file-write y file-type "," file-type 0 file-type "]" file-type ","
   file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
-  file-type "[" file-write x + 1 file-type "," file-write y + 1 file-type "," file-type my_breed file-type "]" file-type ","
+  ;file-type "[" file-write x + 2 file-type "," file-write y + 2 file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x + 20 file-type "," file-write y + 20 file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x + 40 file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x + 20  file-type "," file-write y - 20 file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
 
 end
 
-to meet    ;; turtle procedure - when two turtles are next door,
-           ;; the left one changes to the color of the right one
-  let candidate one-of turtles-at 1 0
-  if candidate != nobody [
-    set color [color] of candidate
-  ]
+to flock  ;; turtle procedure
+  find-flockmates
+  if any? flockmates
+    [ find-nearest-neighbor
+      ifelse distance nearest-neighbor < minimum-separation
+        [ separate ]
+        [ align
+          cohere ] ]
 end
 
-to find-top-species  ;;find the percentage of the most populous species
-  let winning-amount 0
-  foreach base-colors [ c ->
-    let how-many count turtles with [color = c]
-    if how-many > winning-amount
-      [ set winning-amount how-many ]
-  ]
-  set max-percent (100 * winning-amount / count turtles)
+to find-flockmates  ;; turtle procedure
+  set flockmates other turtles in-radius vision
 end
 
-;; ---------------------------------------------------------------------------------
-;; Below this point are procedure definitions that have to do with "walls," which
-;; the user may create in order to separate groups of turtles from one another.
-;; The use of walls is optional, and can be seen as a more advanced topic.
-;; ---------------------------------------------------------------------------------
-
-to place-wall
-  if mouse-down? [
-    ;; Note that when we place a wall, we must also place walls
-    ;; at the world boundaries, so turtles can't change rooms
-    ;; by wrapping around the edge of the world.
-    ask patches with [abs pycor = max-pycor or
-                      pycor = round mouse-ycor] [
-      set pcolor white
-      ;; There might be some turtles standing where the
-      ;; new walls is, so we need to move them into a room.
-      ask turtles-here [ move-off-wall ]
-    ]
-    display
-  ]
+to find-nearest-neighbor ;; turtle procedure
+  set nearest-neighbor min-one-of flockmates [distance myself]
 end
 
-to remove-wall
-  if mouse-down? [
-    ask patches with [pycor = round mouse-ycor]
-      [ set pcolor black ]
-    display
-  ]
+;;; SEPARATE
+
+to separate  ;; turtle procedure
+  turn-away ([heading] of nearest-neighbor) max-separate-turn
 end
 
-to remove-all-walls
-  clear-patches
+;;; ALIGN
+
+to align  ;; turtle procedure
+  turn-towards average-flockmate-heading max-align-turn
 end
 
-to move-off-wall  ;; turtle procedure
-  while [pcolor != black] [
-    move-to one-of neighbors
-  ]
+to-report average-flockmate-heading  ;; turtle procedure
+  ;; We can't just average the heading variables here.
+  ;; For example, the average of 1 and 359 should be 0,
+  ;; not 180.  So we have to use trigonometry.
+  let x-component sum [dx] of flockmates
+  let y-component sum [dy] of flockmates
+  ifelse x-component = 0 and y-component = 0
+    [ report heading ]
+    [ report atan x-component y-component ]
+end
+
+;;; COHERE
+
+to cohere  ;; turtle procedure
+  turn-towards average-heading-towards-flockmates max-cohere-turn
+end
+
+to-report average-heading-towards-flockmates  ;; turtle procedure
+  ;; "towards myself" gives us the heading from the other turtle
+  ;; to me, but we want the heading from me to the other turtle,
+  ;; so we add 180
+  let x-component mean [sin (towards myself + 180)] of flockmates
+  let y-component mean [cos (towards myself + 180)] of flockmates
+  ifelse x-component = 0 and y-component = 0
+    [ report heading ]
+    [ report atan x-component y-component ]
+end
+
+;;; HELPER PROCEDURES
+
+to turn-towards [new-heading max-turn]  ;; turtle procedure
+  turn-at-most (subtract-headings new-heading heading) max-turn
+end
+
+to turn-away [new-heading max-turn]  ;; turtle procedure
+  turn-at-most (subtract-headings heading new-heading) max-turn
+end
+
+;; turn right by "turn" degrees (or left if "turn" is negative),
+;; but never turn more than "max-turn" degrees
+to turn-at-most [turn max-turn]  ;; turtle procedure
+  ifelse abs turn > max-turn
+    [ ifelse turn > 0
+        [ rt max-turn ]
+        [ lt max-turn ] ]
+    [ rt turn ]
 end
 
 
-; Copyright 1997 Uri Wilensky.
+; Copyright 1998 Uri Wilensky.
 ; See Info tab for full copyright and license.
 @#$#@#$#@
 GRAPHICS-WINDOW
-305
+250
 10
-733
-439
+755
+516
 -1
 -1
-12.0
+7.0
 1
 10
 1
@@ -144,10 +150,10 @@ GRAPHICS-WINDOW
 1
 1
 1
--17
-17
--17
-17
+-35
+35
+-35
+35
 1
 1
 1
@@ -155,11 +161,28 @@ ticks
 30.0
 
 BUTTON
-98
-80
-171
-113
-go
+39
+93
+116
+126
+NIL
+setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
+
+BUTTON
+122
+93
+203
+126
+NIL
 go
 T
 1
@@ -171,192 +194,172 @@ NIL
 NIL
 0
 
-BUTTON
-18
-80
-95
-113
-setup
-setup
-NIL
+SLIDER
+9
+51
+232
+84
+population
+population
+1.0
+1000.0
+39.0
+1.0
 1
-T
-OBSERVER
 NIL
-NIL
-NIL
-NIL
-1
+HORIZONTAL
 
 SLIDER
-158
-36
-287
-69
-colors
-colors
-2
-10
+4
+217
+237
+250
+max-align-turn
+max-align-turn
+0.0
+20.0
 5.0
+0.25
 1
-1
-NIL
+degrees
 HORIZONTAL
 
 SLIDER
-15
-36
-156
-69
-number
-number
+4
+251
+237
+284
+max-cohere-turn
+max-cohere-turn
+0.0
+20.0
+3.0
+0.25
 1
-1000
-72.0
-1
-1
-NIL
+degrees
 HORIZONTAL
 
-PLOT
-5
-130
-298
-353
-Turtle Populations
-Time
-Number
+SLIDER
+4
+285
+237
+318
+max-separate-turn
+max-separate-turn
 0.0
-100.0
+20.0
+1.5
+0.25
+1
+degrees
+HORIZONTAL
+
+SLIDER
+9
+135
+232
+168
+vision
+vision
 0.0
-70.0
-true
-false
-"set-plot-y-range 0 count turtles" ""
-PENS
-"color5" 1.0 0 -7500403 true "" "plot count turtles with [color = 5]"
-"color15" 1.0 0 -2674135 true "" "plot count turtles with [color = 15]"
-"color25" 1.0 0 -955883 true "" "plot count turtles with [color = 25]"
-"color35" 1.0 0 -6459832 true "" "plot count turtles with [color = 35]"
-"color45" 1.0 0 -1184463 true "" "plot count turtles with [color = 45]"
-"color55" 1.0 0 -10899396 true "" "plot count turtles with [color = 55]"
-"color65" 1.0 0 -13840069 true "" "plot count turtles with [color = 65]"
-"color125" 1.0 0 -5825686 true "" "plot count turtles with [color = 75]"
-"color85" 1.0 0 -11221820 true "" "plot count turtles with [color = 85]"
-"color95" 1.0 0 -13791810 true "" "plot count turtles with [color = 95]"
+10.0
+5.0
+0.5
+1
+patches
+HORIZONTAL
 
-MONITOR
-35
-151
-152
-196
-% most populous
-max-percent
-2
-1
-11
-
-BUTTON
-5
-421
-95
-454
-NIL
-place-wall
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-100
-421
-195
-454
-NIL
-remove-wall
-T
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-BUTTON
-200
-421
-300
-454
-NIL
-remove-all-walls
-NIL
-1
-T
-OBSERVER
-NIL
-NIL
-NIL
-NIL
-1
-
-TEXTBOX
-24
-391
-281
-419
-As the model runs, you may optionally create and\nremove walls that separate groups of turtles.
-10
+SLIDER
+9
+169
+232
+202
+minimum-separation
+minimum-separation
 0.0
-0
+5.0
+1.0
+0.25
+1
+patches
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
 
-This model is an example of random selection. It shows that turtles that randomly exchange colors converge on a single color.  The idea, explained in more detail in Dennett's "Darwin's Dangerous Idea", is that trait drifts can occur without any particular purpose or "selective pressure".
+This model is an attempt to mimic the flocking of birds.  (The resulting motion also resembles schools of fish.)  The flocks that appear in this model are not created or led in any way by special leader birds.  Rather, each bird is following exactly the same set of rules, from which flocks emerge.
 
 ## HOW IT WORKS
 
-The model starts with a random distribution of colored agents.  Turtles move by wiggling randomly across the world. When two turtles are next to each other, one turtle changes its color to the color of the other one.  Note that if a color dies out, it can never come back.
+The birds follow three rules: "alignment", "separation", and "cohesion".
+
+"Alignment" means that a bird tends to turn so that it is moving in the same direction that nearby birds are moving.
+
+"Separation" means that a bird will turn to avoid another bird which gets too close.
+
+"Cohesion" means that a bird will move towards other nearby birds (unless another bird is too close).
+
+When two birds are too close, the "separation" rule overrides the other two, which are deactivated until the minimum separation is achieved.
+
+The three rules affect only the bird's heading.  Each bird always moves forward at the same constant speed.
 
 ## HOW TO USE IT
 
-The NUMBER slider sets the number of turtles. The COLORS slider selects the number of competing colors, up to ten.
+First, determine the number of birds you want in the simulation and set the POPULATION slider to that value.  Press SETUP to create the birds, and press GO to have them start flying around.
 
-The SETUP button initializes the model, and GO runs the model.
+The default settings for the sliders will produce reasonably good flocking behavior.  However, you can play with them to get variations:
 
-A monitor shows the percentage of turtles sharing the most common color.  When this reaches 100%, the model stops.
+Three TURN-ANGLE sliders control the maximum angle a bird can turn as a result of each rule.
 
-After pressing PLACE-WALLS, the user can "draw" walls in the world at the location where the user clicks with the mouse.  By pressing REMOVE-WALLS, the user can remove added walls.  The REMOVE-ALL-WALLS button removes all walls including the border.  (The SETUP button does not remove walls.)
+VISION is the distance that each bird can see 360 degrees around it.
 
 ## THINGS TO NOTICE
 
-Gradually a color will gain a slight dominance. By statistical advantage, a dominant color becomes more likely to have more colors like it.  However, because the process is random, there will usually be a series of dominant colors before one color finally wins.
+Central to the model is the observation that flocks form without a leader.
+
+There are no random numbers used in this model, except to position the birds initially.  The fluid, lifelike behavior of the birds is produced entirely by deterministic rules.
+
+Also, notice that each flock is dynamic.  A flock, once together, is not guaranteed to keep all of its members.  Why do you think this is?
+
+After running the model for a while, all of the birds have approximately the same heading.  Why?
+
+Sometimes a bird breaks away from its flock.  How does this happen?  You may need to slow down the model or run it step by step in order to observe this phenomenon.
 
 ## THINGS TO TRY
 
-Experiment with adding walls.
+Play with the sliders to see if you can get tighter flocks, looser flocks, fewer flocks, more flocks, more or less splitting and joining of flocks, more or less rearranging of birds within flocks, etc.
 
-When walls are added, groups of individuals can be geographically isolated so that they can not interact with their neighbors on the other side of the wall. Groups that are geographically isolated with walls will often end up with a different dominant color than the larger population.  A group of individuals that is walled off becomes a "founding group".  The founding group of individuals has a different genetic variability and distribution than the main population, so the frequency of certain traits may end up drifting in a different direction compared with the much larger population.
+You can turn off a rule entirely by setting that rule's angle slider to zero.  Is one rule by itself enough to produce at least some flocking?  What about two rules?  What's missing from the resulting behavior when you leave out each rule?
+
+Will running the model for a long time produce a static flock?  Or will the birds never settle down to an unchanging formation?  Remember, there are no random numbers used in this model.
 
 ## EXTENDING THE MODEL
 
-In this model, a turtle looks one patch to its right.  If there's another turtle there, the "looking" turtle changes to that turtle's color.  Since the turtles move randomly about the world, it's a matter of chance which turtle will change to the color of its neighbor.
+Currently the birds can "see" all around them.  What happens if birds can only see in front of them?  The `in-cone` primitive can be used for this.
 
-Think of other rules for turtle interactions, random or otherwise, by which a turtle color might "take over".
+Is there some way to get V-shaped flocks, like migrating geese?
+
+What happens if you put walls around the edges of the world that the birds can't fly into?
+
+Can you get the birds to fly around obstacles in the middle of the world?
+
+What would happen if you gave the birds different velocities?  For example, you could make birds that are not near other birds fly faster to catch up to the flock.  Or, you could simulate the diminished air resistance that birds experience when flying together by making them fly faster when in a group.
+
+Are there other interesting ways you can make the birds different from each other?  There could be random variation in the population, or you could have distinct "species" of bird.
+
+## NETLOGO FEATURES
+
+Notice the need for the `subtract-headings` primitive and special procedure for averaging groups of headings.  Just subtracting the numbers, or averaging the numbers, doesn't give you the results you'd expect, because of the discontinuity where headings wrap back to 0 once they reach 360.
 
 ## RELATED MODELS
 
-* GenDrift (P Global)
-* GenDrift (P local)
-* GenDrift (T reproduce)
+* Moths
+* Flocking Vee Formation
+* Flocking - Alternative Visualizations
+
+## CREDITS AND REFERENCES
+
+This model is inspired by the Boids simulation invented by Craig Reynolds.  The algorithm we use here is roughly similar to the original Boids algorithm, but it is not the same.  The exact details of the algorithm tend not to matter very much -- as long as you have alignment, separation, and cohesion, you will usually get flocking behavior resembling that produced by Reynolds' original model.  Information on Boids is available at http://www.red3d.com/cwr/boids/.
 
 ## HOW TO CITE
 
@@ -364,7 +367,7 @@ If you mention this model or the NetLogo software in a publication, we ask that 
 
 For the model itself:
 
-* Wilensky, U. (1997).  NetLogo GenDrift T interact model.  http://ccl.northwestern.edu/netlogo/models/GenDriftTinteract.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
+* Wilensky, U. (1998).  NetLogo Flocking model.  http://ccl.northwestern.edu/netlogo/models/Flocking.  Center for Connected Learning and Computer-Based Modeling, Northwestern University, Evanston, IL.
 
 Please cite the NetLogo software as:
 
@@ -372,7 +375,7 @@ Please cite the NetLogo software as:
 
 ## COPYRIGHT AND LICENSE
 
-Copyright 1997 Uri Wilensky.
+Copyright 1998 Uri Wilensky.
 
 ![CC BY-NC-SA 3.0](http://ccl.northwestern.edu/images/creativecommons/byncsa.png)
 
@@ -382,9 +385,9 @@ Commercial licenses are also available. To inquire about commercial licenses, pl
 
 This model was created as part of the project: CONNECTED MATHEMATICS: MAKING SENSE OF COMPLEX PHENOMENA THROUGH BUILDING OBJECT-BASED PARALLEL MODELS (OBPML).  The project gratefully acknowledges the support of the National Science Foundation (Applications of Advanced Technologies Program) -- grant numbers RED #9552950 and REC #9632612.
 
-This model was converted to NetLogo as part of the projects: PARTICIPATORY SIMULATIONS: NETWORK-BASED DESIGN FOR SYSTEMS LEARNING IN CLASSROOMS and/or INTEGRATED SIMULATION AND MODELING ENVIRONMENT. The project gratefully acknowledges the support of the National Science Foundation (REPP & ROLE programs) -- grant numbers REC #9814682 and REC-0126227. Converted from StarLogoT to NetLogo, 2001.
+This model was converted to NetLogo as part of the projects: PARTICIPATORY SIMULATIONS: NETWORK-BASED DESIGN FOR SYSTEMS LEARNING IN CLASSROOMS and/or INTEGRATED SIMULATION AND MODELING ENVIRONMENT. The project gratefully acknowledges the support of the National Science Foundation (REPP & ROLE programs) -- grant numbers REC #9814682 and REC-0126227. Converted from StarLogoT to NetLogo, 2002.
 
-<!-- 1997 2001 -->
+<!-- 1998 2002 -->
 @#$#@#$#@
 default
 true
@@ -670,6 +673,9 @@ Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
 NetLogo 6.1.0
 @#$#@#$#@
+set population 200
+setup
+repeat 200 [ go ]
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@

@@ -235,8 +235,10 @@ to file_write [my_breed]
   let y1 ycor + min-pycor
   let y round (y1 * (800 / (min-pycor - max-pycor)))
 
+
   file-type "[" file-write x file-type "," file-write y file-type "," file-type 0 file-type "]" file-type ","
-  file-type "[" file-write x + 2 file-type "," file-write y + 2 file-type "," file-type my_breed file-type "]" file-type ","
+  ;file-type "[" file-write x file-type "," file-write y file-type "," file-type my_breed file-type "]" file-type ","
+  file-type "[" file-write x + 10 file-type "," file-write y + 10 file-type "," file-type my_breed file-type "]" file-type ","
 
 end
 
@@ -387,7 +389,7 @@ to go
   ifelse (count NeedSignalCancerCells + count LateApoCancerCells + count BlockedApoCancerCells > 0)
   [
     common-go-procedures
-    file-open "simu_output42.txt"
+    file-open "simu_output_macro.txt"
     output_coordinates
     tick
     file-close
@@ -1458,7 +1460,7 @@ false
 Polygon -7500403 true true 270 75 225 30 30 225 75 270
 Polygon -7500403 true true 30 75 75 30 270 225 225 270
 @#$#@#$#@
-NetLogo 3D 6.1.0
+NetLogo 3D 6.1.1
 @#$#@#$#@
 @#$#@#$#@
 @#$#@#$#@
