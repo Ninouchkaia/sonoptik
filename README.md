@@ -1,7 +1,7 @@
 # Sonoptic
 
 Sonoptic is an artistic residency focused on sound, visual and/or audiovisual approaches. 
-It was organized at [Myxart Myrys](http://mixart-myrys.org/) from October 5 to 10, 2020.
+It was organized at [Mixart Myrys](http://mixart-myrys.org/) from October 5 to 10, 2020.
 More info here : http://sonoptic.net/
 
 I joined the event with the aim of exploring different perspectives on data sonification and visualization.
